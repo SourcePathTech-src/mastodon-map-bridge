@@ -59,14 +59,38 @@ new Cli({
             return;
           }
 
-          console.log("Body content:", event.content.body);
-          try {
-            const status = await mastodonClient.v1.statuses.create({
-              status: event.content.body,
-            });
-            console.log("Posted to Mastodon:", status.url);
-          } catch (error) {
-            console.log("Error posting to Mastodon:", error);
+          const body = event.content.body;
+          console.log("Body content:", body);
+
+          if (body.trim() === "!latest") {
+            try {
+              const notifications =
+                await mastodonClient.v1.notifications.list();
+              if (notifications.length === 0) {
+                await bridge
+                  .getIntent(config.matrix.botUserId)
+                  .sendText(config.matrix.roomId, "No new notifications.");
+              } else {
+                const messages = notifications
+                  .map(
+                    (n) =>
+                      `${n.type} from ${n.account.username}: ${n.status ? n.status.content : ""}`,
+                  )
+                  .join("\n");
+                await bridge
+                  .getIntent(config.matrix.botUserId)
+                  .sendText(config.matrix.roomId, messages);
+              }
+              console.log("Notifications fetched and sent to Matrix.");
+            } catch (error) {
+              console.log("Error fetching notifications:", error);
+              await bridge
+                .getIntent(config.matrix.botUserId)
+                .sendText(
+                  config.matrix.roomId,
+                  "Error fetching notifications.",
+                );
+            }
           }
         },
       },
@@ -77,13 +101,15 @@ new Cli({
       .then(async () => {
         console.log("Matrix-side listening on port %s", port);
 
-        // Ensure the bot joins the room and sends a greeting message
         try {
+          console.log(
+            `Ensuring bot user ${config.matrix.botUserId} is registered...`,
+          );
           await bridge.getIntent(config.matrix.botUserId).ensureRegistered();
           console.log(`Bot ${config.matrix.botUserId} has been registered.`);
 
-          // Debugging: Check if the room exists and the bot can join it
           try {
+            console.log(`Attempting to join room ${config.matrix.roomId}...`);
             await bridge
               .getIntent(config.matrix.botUserId)
               .join(config.matrix.roomId);
