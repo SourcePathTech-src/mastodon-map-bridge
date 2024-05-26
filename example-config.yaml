@@ -1,0 +1,9 @@
+matrix:
+  homeserverUrl: "http://matrix.yourdomain.com"
+  domain: "yourdomain.com"
+  roomId: "!your-room-id:yourdomain.com"
+  botUserId: "@mastobot:yourdomain.com"
+
+mastodon:
+  accessToken: "your-mastodon-access-token"
+  apiUrl: "https://mastodon.yourinstance.com"
