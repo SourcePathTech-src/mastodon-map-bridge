@@ -1,5 +1,5 @@
 matrix:
-  homeserverUrl: "http://matrix.yourdomain.com"
+  homeserverUrl: "https://matrix.yourdomain.com"
   domain: "yourdomain.com"
   roomId: "!your-room-id:yourdomain.com"
   botUserId: "@mastobot:yourdomain.com"

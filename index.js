@@ -74,33 +74,38 @@ new Cli({
 
     bridge
       .run(port)
-      .then(() => {
+      .then(async () => {
         console.log("Matrix-side listening on port %s", port);
 
         // Ensure the bot joins the room and sends a greeting message
-        bridge
-          .getIntent(config.matrix.botUserId)
-          .join(config.matrix.roomId)
-          .then(() => {
+        try {
+          await bridge.getIntent(config.matrix.botUserId).ensureRegistered();
+          console.log(`Bot ${config.matrix.botUserId} has been registered.`);
+
+          // Debugging: Check if the room exists and the bot can join it
+          try {
+            await bridge
+              .getIntent(config.matrix.botUserId)
+              .join(config.matrix.roomId);
             console.log(
               `Bot ${config.matrix.botUserId} has joined the room ${config.matrix.roomId}`,
             );
-            return bridge
+            await bridge
               .getIntent(config.matrix.botUserId)
               .sendText(
                 config.matrix.roomId,
                 "Hello! The bridge is now up and running.",
               );
-          })
-          .then(() => {
             console.log("Greeting message sent to the room.");
-          })
-          .catch((err) => {
-            console.error(`Failed to join room or send greeting: ${err}`);
-          });
+          } catch (err) {
+            console.error(`Failed to join room: ${err.message}`);
+          }
+        } catch (err) {
+          console.error(`Failed to register bot: ${err.message}`);
+        }
       })
       .catch((err) => {
-        console.error(`Failed to initialize the bridge: ${err}`);
+        console.error(`Failed to initialize the bridge: ${err.message}`);
       });
   },
 }).run();
