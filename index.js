@@ -132,6 +132,7 @@ new Cli({
       })
       .catch((err) => {
         console.error(`Failed to initialize the bridge: ${err.message}`);
+        console.error(err);
       });
   },
 }).run();
