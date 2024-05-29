@@ -88,7 +88,7 @@ new Cli({
               .getIntent(config.matrix.botUserId)
               .sendText(
                 event.room_id,
-                "To post a status on Mastodon, use the following format:\n\n!post Your status text here.",
+                "To post a status on Mastodon, use the following format:\n\n!masto post Your status text here.",
               );
           } else {
             bridge
@@ -146,11 +146,7 @@ new Cli({
 async function fetchAndSendNotifications() {
   try {
     const notifications = await mastodonClient.v1.notifications.list();
-    if (notifications.length === 0) {
-      await bridge
-        .getIntent(config.matrix.botUserId)
-        .sendText(config.matrix.roomId, "No new notifications.");
-    } else {
+    if (notifications.length !== 0) {
       const messages = notifications
         .map((n) => {
           const content = n.status
@@ -159,11 +155,27 @@ async function fetchAndSendNotifications() {
           return `${n.type} from ${n.account.username}: ${content}`;
         })
         .join("\n\n");
+
       await bridge
         .getIntent(config.matrix.botUserId)
         .sendText(config.matrix.roomId, messages);
+
+      // Dismiss notifications
+      for (const notification of notifications) {
+        try {
+          await mastodonClient.v1.notifications
+            .$select(notification.id)
+            .dismiss();
+          console.log(`Notification ${notification.id} dismissed.`);
+        } catch (error) {
+          console.log(
+            `Error dismissing notification ${notification.id}:`,
+            error,
+          );
+        }
+      }
+      console.log("Notifications dismissed.");
     }
-    console.log("Notifications fetched and sent to Matrix.");
   } catch (error) {
     console.log("Error fetching notifications:", error);
     await bridge
