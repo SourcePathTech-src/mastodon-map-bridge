@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "html-to-text": "^9.0.5",
     "masto": "^6.7.7",
     "matrix-appservice-bridge": "^10.1.0",
     "request": "^2.88.2"
