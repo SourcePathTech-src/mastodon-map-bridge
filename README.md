@@ -1,4 +1,4 @@
-# imap-map-bridge
+# mastodon-map-bridge
 
 To install dependencies:
 
