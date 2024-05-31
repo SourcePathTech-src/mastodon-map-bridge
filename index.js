@@ -1,5 +1,6 @@
 import { Cli, Bridge, AppServiceRegistration } from "matrix-appservice-bridge";
 import { createRestAPIClient } from "masto";
+import { htmlToText } from "html-to-text";
 import fs from "fs";
 import yaml from "js-yaml";
 
@@ -62,35 +63,37 @@ new Cli({
           const body = event.content.body;
           console.log("Body content:", body);
 
-          if (body.trim() === "!latest") {
+          const postCmd = "!masto post ";
+          if (body.startsWith(postCmd)) {
+            const status = body.substring(postCmd.length).trim();
             try {
-              const notifications =
-                await mastodonClient.v1.notifications.list();
-              if (notifications.length === 0) {
-                await bridge
-                  .getIntent(config.matrix.botUserId)
-                  .sendText(config.matrix.roomId, "No new notifications.");
-              } else {
-                const messages = notifications
-                  .map(
-                    (n) =>
-                      `${n.type} from ${n.account.username}: ${n.status ? n.status.content : ""}`,
-                  )
-                  .join("\n");
-                await bridge
-                  .getIntent(config.matrix.botUserId)
-                  .sendText(config.matrix.roomId, messages);
-              }
-              console.log("Notifications fetched and sent to Matrix.");
+              const response = await mastodonClient.v1.statuses.create({
+                status: status,
+              });
+              console.log("Posted to Mastodon:", response.url);
+              bridge
+                .getIntent(config.matrix.botUserId)
+                .sendText(event.room_id, `Posted to Mastodon: ${response.url}`);
             } catch (error) {
-              console.log("Error fetching notifications:", error);
-              await bridge
+              console.log("Error posting to Mastodon:", error);
+              bridge
                 .getIntent(config.matrix.botUserId)
                 .sendText(
-                  config.matrix.roomId,
-                  "Error fetching notifications.",
+                  event.room_id,
+                  `Error posting to Mastodon: ${error.message}`,
                 );
             }
+          } else if (body === "!masto help") {
+            bridge
+              .getIntent(config.matrix.botUserId)
+              .sendText(
+                event.room_id,
+                "To post a status on Mastodon, use the following format:\n\n!masto post Your status text here.",
+              );
+          } else {
+            bridge
+              .getIntent(config.matrix.botUserId)
+              .sendText(event.room_id, "Use `!masto help` for more info");
           }
         },
       },
@@ -129,9 +132,54 @@ new Cli({
         } catch (err) {
           console.error(`Failed to register bot: ${err.message}`);
         }
+
+        // Start fetching Mastodon notifications
+        setInterval(fetchAndSendNotifications, 1000);
       })
       .catch((err) => {
         console.error(`Failed to initialize the bridge: ${err.message}`);
+        console.error(err);
       });
   },
 }).run();
+
+async function fetchAndSendNotifications() {
+  try {
+    const notifications = await mastodonClient.v1.notifications.list();
+    if (notifications.length !== 0) {
+      const messages = notifications
+        .map((n) => {
+          const content = n.status
+            ? htmlToText(n.status.content, { wordwrap: 130 })
+            : "";
+          return `${n.type} from ${n.account.username}: ${content}`;
+        })
+        .join("\n\n");
+
+      await bridge
+        .getIntent(config.matrix.botUserId)
+        .sendText(config.matrix.roomId, messages);
+
+      // Dismiss notifications
+      for (const notification of notifications) {
+        try {
+          await mastodonClient.v1.notifications
+            .$select(notification.id)
+            .dismiss();
+          console.log(`Notification ${notification.id} dismissed.`);
+        } catch (error) {
+          console.log(
+            `Error dismissing notification ${notification.id}:`,
+            error,
+          );
+        }
+      }
+      console.log("Notifications dismissed.");
+    }
+  } catch (error) {
+    console.log("Error fetching notifications:", error);
+    await bridge
+      .getIntent(config.matrix.botUserId)
+      .sendText(config.matrix.roomId, "Error fetching notifications.");
+  }
+}
